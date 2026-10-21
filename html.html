@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>じゃんけんゲーム</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Canvas Confetti -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@400;700;900&display=swap" rel="stylesheet">
+
+    <style>
+        body {
+            font-family: 'M PLUS Rounded 1c', sans-serif;
+            user-select: none;
+        }
+
+        .hand-bounce {
+            animation: bounce 0.6s infinite alternate ease-in-out;
+        }
+
+        @keyframes bounce {
+            0% { transform: translateY(0) scale(1); }
+            100% { transform: translateY(-15px) scale(1.05); }
+        }
+
+        .shake-hand {
+            animation: shake 0.2s ease-in-out infinite;
+        }
+
+        @keyframes shake {
+            0%, 100% { transform: rotate(0deg); }
+            25% { transform: rotate(-12deg); }
+            75% { transform: rotate(12deg); }
+        }
+
+        .btn-pop {
+            transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .btn-pop:active {
+            transform: scale(0.92);
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 min-h-screen flex items-center justify-center p-4">
+
+    <div class="bg-white/95 backdrop-blur-md rounded-3xl shadow-2xl p-6 md:p-8 w-full max-w-lg border border-white/20 relative overflow-hidden">
+        
+        <!-- ヘッダー＆スコアボード -->
+        <div class="text-center mb-6">
+            <h1 class="text-3xl md:text-4xl font-black text-gray-800 tracking-wide mb-2">
+                じゃんけん<span class="text-indigo-600">BATTLE</span>
+            </h1>
+            <p class="text-xs md:text-sm font-bold text-gray-500">相手の手を読んで連勝を目指そう！</p>
+        </div>
+
+        <!-- スコア表示エリア -->
+        <div class="grid grid-cols-4 gap-2 bg-slate-100 p-3 rounded-2xl mb-6 text-center shadow-inner">
+            <div class="bg-white p-2 rounded-xl shadow-sm">
+                <p class="text-xs text-gray-400 font-bold">勝ち</p>
+                <p id="wins" class="text-xl md:text-2xl font-black text-emerald-500">0</p>
+            </div>
+            <div class="bg-white p-2 rounded-xl shadow-sm">
+                <p class="text-xs text-gray-400 font-bold">負け</p>
+                <p id="losses" class="text-xl md:text-2xl font-black text-rose-500">0</p>
+            </div>
+            <div class="bg-white p-2 rounded-xl shadow-sm">
+                <p class="text-xs text-gray-400 font-bold">引き分け</p>
+                <p id="draws" class="text-xl md:text-2xl font-black text-amber-500">0</p>
+            </div>
+            <div class="bg-gradient-to-br from-indigo-500 to-purple-600 p-2 rounded-xl shadow-sm text-white">
+                <p class="text-xs text-indigo-100 font-bold">連勝数</p>
+                <p id="streak" class="text-xl md:text-2xl font-black">0</p>
+            </div>
+        </div>
+
+        <!-- 対戦対決ステージ -->
+        <div class="relative bg-slate-800 rounded-2xl p-6 mb-6 shadow-xl flex justify-between items-center min-h-[220px] overflow-hidden">
+            <!-- 背景デコレーション -->
+            <div class="absolute inset-0 opacity-10 bg-[radial-gradient(#fff_1px,transparent_1px)] [background-size:16px_16px]"></div>
+
+            <!-- CPU（相手）エリア -->
+            <div class="flex flex-col items-center z-10 w-1/3">
+                <span class="bg-rose-500 text-white text-xs px-3 py-1 rounded-full font-bold mb-3 shadow">CPU</span>
+                <div id="cpu-hand-box" class="w-20 h-20 md:w-24 md:h-24 bg-slate-700/80 rounded-2xl flex items-center justify-center text-4xl md:text-5xl border-2 border-slate-600 shadow-lg text-white">
+                    <i id="cpu-icon" class="fa-solid fa-robot"></i>
+                </div>
+            </div>
+
+            <!-- VS表示 & 勝敗結果判定 -->
+            <div class="flex flex-col items-center justify-center z-10 w-1/3 text-center">
+                <div id="vs-badge" class="text-2xl md:text-3xl font-black text-amber-400 italic mb-1 animate-pulse">VS</div>
+                <div id="result-text" class="text-lg md:text-2xl font-black text-white min-h-[36px] flex items-center justify-center">
+                    じゃんけん…
+                </div>
+            </div>
+
+            <!-- PLAYER（自分）エリア -->
+            <div class="flex flex-col items-center z-10 w-1/3">
+                <span class="bg-indigo-500 text-white text-xs px-3 py-1 rounded-full font-bold mb-3 shadow">YOU</span>
+                <div id="player-hand-box" class="w-20 h-20 md:w-24 md:h-24 bg-slate-700/80 rounded-2xl flex items-center justify-center text-4xl md:text-5xl border-2 border-slate-600 shadow-lg text-white">
+                    <i id="player-icon" class="fa-solid fa-user"></i>
+                </div>
+            </div>
+        </div>
+
+        <div class="space-y-3">
+            <p class="text-center text-xs font-bold text-gray-400">出す手を選んでください（キーボード 1, 2, 3 でも操作可）</p>
+            <div class="grid grid-cols-3 gap-3">
+                <button onclick="playGame('rock')" class="btn-pop bg-gradient-to-b from-rose-400 to-rose-500 hover:from-rose-500 hover:to-rose-600 text-white p-4 rounded-2xl font-black flex flex-col items-center justify-center gap-2 shadow-lg border-b-4 border-rose-700 active:border-b-0">
+                    <i class="fa-solid fa-hand-fist text-3xl md:text-4xl"></i>
+                    <span class="text-sm md:text-base">グー (1)</span>
+                </button>
+                <button onclick="playGame('scissors')" class="btn-pop bg-gradient-to-b from-amber-400 to-amber-500 hover:from-amber-500 hover:to-amber-600 text-white p-4 rounded-2xl font-black flex flex-col items-center justify-center gap-2 shadow-lg border-b-4 border-amber-700 active:border-b-0">
+                    <i class="fa-solid fa-hand-scissors text-3xl md:text-4xl -rotate-90"></i>
+                    <span class="text-sm md:text-base">チョキ (2)</span>
+                </button>
+                <button onclick="playGame('paper')" class="btn-pop bg-gradient-to-b from-emerald-400 to-emerald-500 hover:from-emerald-500 hover:to-emerald-600 text-white p-4 rounded-2xl font-black flex flex-col items-center justify-center gap-2 shadow-lg border-b-4 border-emerald-700 active:border-b-0">
+                    <i class="fa-solid fa-hand text-3xl md:text-4xl"></i>
+                    <span class="text-sm md:text-base">パー (3)</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- リセットボタン＆音量切替 -->
+        <div class="mt-6 flex justify-between items-center pt-4 border-t border-gray-100">
+            <button id="sound-btn" onclick="toggleSound()" class="text-xs font-bold text-gray-500 hover:text-gray-700 flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gray-100">
+                <i id="sound-icon" class="fa-solid fa-volume-high"></i> Sound: ON
+            </button>
+            <button onclick="resetStats()" class="text-xs font-bold text-gray-400 hover:text-rose-500 flex items-center gap-1.5 px-3 py-1.5 rounded-lg hover:bg-rose-50 transition">
+                <i class="fa-solid fa-rotate-right"></i> 戦績リセット
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // サウンドWeb Audio APIの設定（外部音声ファイル依存なし）
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        let audioCtx = null;
+        let soundEnabled = true;
+
+        function initAudio() {
+            if (!audioCtx) {
+                audioCtx = new AudioCtx();
+            }
+        }
+
+        // サウンドエフェクト生成関数
+        function playTone(freq, type, duration, delay = 0) {
+            if (!soundEnabled || !audioCtx) return;
+            setTimeout(() => {
+                try {
+                    const osc = audioCtx.createOscillator();
+                    const gain = audioCtx.createGain();
+                    osc.type = type;
+                    osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+                    gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+                    osc.connect(gain);
+                    gain.connect(audioCtx.destination);
+                    osc.start();
+                    osc.stop(audioCtx.currentTime + duration);
+                } catch(e) {}
+            }, delay);
+        }
+
+        // 勝敗に応じた効果音
+        function playSoundEffect(type) {
+            initAudio();
+            if (type === 'click') {
+                playTone(400, 'sine', 0.05);
+            } else if (type === 'win') {
+                playTone(523.25, 'triangle', 0.1, 0);   // C5
+                playTone(659.25, 'triangle', 0.1, 100); // E5
+                playTone(783.99, 'triangle', 0.1, 200); // G5
+                playTone(1046.50, 'triangle', 0.3, 300); // C6
+            } else if (type === 'lose') {
+                playTone(300, 'sawtooth', 0.15, 0);
+                playTone(250, 'sawtooth', 0.15, 120);
+                playTone(200, 'sawtooth', 0.3, 240);
+            } else if (type === 'draw') {
+                playTone(440, 'sine', 0.1, 0);
+                playTone(440, 'sine', 0.2, 120);
+            }
+        }
+
+        function toggleSound() {
+            soundEnabled = !soundEnabled;
+            const btn = document.getElementById('sound-btn');
+            const icon = document.getElementById('sound-icon');
+            if (soundEnabled) {
+                btn.classList.remove('text-gray-400');
+                btn.classList.add('text-gray-500');
+                icon.className = 'fa-solid fa-volume-high';
+                btn.innerHTML = `<i id="sound-icon" class="fa-solid fa-volume-high"></i> Sound: ON`;
+            } else {
+                btn.classList.add('text-gray-400');
+                icon.className = 'fa-solid fa-volume-xmark';
+                btn.innerHTML = `<i id="sound-icon" class="fa-solid fa-volume-xmark"></i> Sound: OFF`;
+            }
+        }
+
+        let stats = {
+            wins: 0,
+            losses: 0,
+            draws: 0,
+            streak: 0
+        };
+
+        const hands = {
+            rock: { icon: 'fa-hand-fist', label: 'グー', class: 'rotate-0' },
+            scissors: { icon: 'fa-hand-scissors', label: 'チョキ', class: '-rotate-90' },
+            paper: { icon: 'fa-hand', label: 'パー', class: 'rotate-0' }
+        };
+
+        let isPlaying = false;
+
+        function playGame(playerChoice) {
+            if (isPlaying) return;
+            isPlaying = true;
+
+            playSoundEffect('click');
+
+            const cpuHandBox = document.getElementById('cpu-hand-box');
+            const playerHandBox = document.getElementById('player-hand-box');
+            const cpuIcon = document.getElementById('cpu-icon');
+            const playerIcon = document.getElementById('player-icon');
+            const resultText = document.getElementById('result-text');
+
+            // 準備状態のアニメーション設定
+            resultText.textContent = "ぽんっ！";
+            resultText.className = "text-xl md:text-2xl font-black text-amber-400 animate-bounce";
+
+            cpuHandBox.className = "w-20 h-20 md:w-24 md:h-24 bg-slate-700/80 rounded-2xl flex items-center justify-center text-4xl md:text-5xl border-2 border-slate-600 shadow-lg text-white shake-hand";
+            playerHandBox.className = "w-20 h-20 md:w-24 md:h-24 bg-slate-700/80 rounded-2xl flex items-center justify-center text-4xl md:text-5xl border-2 border-slate-600 shadow-lg text-white shake-hand";
+
+            // 一時的にデフォルトアイコン（グー）に設定してシャッフル感
+            playerIcon.className = `fa-solid fa-hand-fist`;
+            cpuIcon.className = `fa-solid fa-hand-fist`;
+
+            // じゃんけん決定処理のタイマー（0.6秒）
+            setTimeout(() => {
+                // CPUの手をランダム決定
+                const handKeys = Object.keys(hands);
+                const cpuChoice = handKeys[Math.floor(Math.random() * handKeys.length)];
+
+                // アニメーションクラス除去
+                cpuHandBox.classList.remove('shake-hand');
+                playerHandBox.classList.remove('shake-hand');
+
+                // アイコンセット
+                playerIcon.className = `fa-solid ${hands[playerChoice].icon} ${hands[playerChoice].class}`;
+                cpuIcon.className = `fa-solid ${hands[cpuChoice].icon} ${hands[cpuChoice].class}`;
+
+                // 勝敗判定
+                const result = getResult(playerChoice, cpuChoice);
+                updateResultUI(result, playerChoice, cpuChoice);
+
+                isPlaying = false;
+            }, 600);
+        }
+
+        function getResult(player, cpu) {
+            if (player === cpu) return 'draw';
+            if (
+                (player === 'rock' && cpu === 'scissors') ||
+                (player === 'scissors' && cpu === 'paper') ||
+                (player === 'paper' && cpu === 'rock')
+            ) {
+                return 'win';
+            }
+            return 'lose';
+        }
+
+        function updateResultUI(result, player, cpu) {
+            const resultText = document.getElementById('result-text');
+            const playerHandBox = document.getElementById('player-hand-box');
+            const cpuHandBox = document.getElementById('cpu-hand-box');
+
+            if (result === 'win') {
+                stats.wins++;
+                stats.streak++;
+                resultText.textContent = "勝ち！🎉";
+                resultText.className = "text-2xl md:text-3xl font-black text-emerald-400 scale-110 transition-transform";
+                
+                playerHandBox.className = "w-20 h-20 md:w-24 md:h-24 bg-emerald-600 rounded-2xl flex items-center justify-center text-4xl md:text-5xl border-4 border-emerald-300 shadow-xl text-white hand-bounce";
+                cpuHandBox.className = "w-20 h-20 md:w-24 md:h-24 bg-slate-700/50 rounded-2xl flex items-center justify-center text-4xl md:text-5xl border-2 border-slate-600 opacity-60 text-white";
+
+                playSoundEffect('win');
+
+                // 紙吹雪エフェクト (Win)
+                if (typeof confetti === 'function') {
+                    confetti({
+                        particleCount: 50,
+                        spread: 60,
+                        origin: { y: 0.7 }
+                    });
+                }
+            } else if (result === 'lose') {
+                stats.losses++;
+                stats.streak = 0; // 連勝リセット
+                resultText.textContent = "負け…😭";
+                resultText.className = "text-2xl md:text-3xl font-black text-rose-400";
+
+                playerHandBox.className = "w-20 h-20 md:w-24 md:h-24 bg-slate-700/50 rounded-2xl flex items-center justify-center text-4xl md:text-5xl border-2 border-slate-600 opacity-60 text-white";
+                cpuHandBox.className = "w-20 h-20 md:w-24 md:h-24 bg-rose-600 rounded-2xl flex items-center justify-center text-4xl md:text-5xl border-4 border-rose-300 shadow-xl text-white hand-bounce";
+
+                playSoundEffect('lose');
+            } else {
+                stats.draws++;
+                resultText.textContent = "あいこ！🤝";
+                resultText.className = "text-2xl md:text-3xl font-black text-amber-400";
+
+                playerHandBox.className = "w-20 h-20 md:w-24 md:h-24 bg-amber-600/80 rounded-2xl flex items-center justify-center text-4xl md:text-5xl border-2 border-amber-300 shadow-md text-white";
+                cpuHandBox.className = "w-20 h-20 md:w-24 md:h-24 bg-amber-600/80 rounded-2xl flex items-center justify-center text-4xl md:text-5xl border-2 border-amber-300 shadow-md text-white";
+
+                playSoundEffect('draw');
+            }
+
+            // カウント表示の更新
+            document.getElementById('wins').textContent = stats.wins;
+            document.getElementById('losses').textContent = stats.losses;
+            document.getElementById('draws').textContent = stats.draws;
+            document.getElementById('streak').textContent = stats.streak;
+        }
+
+        function resetStats() {
+            stats = { wins: 0, losses: 0, draws: 0, streak: 0 };
+            document.getElementById('wins').textContent = '0';
+            document.getElementById('losses').textContent = '0';
+            document.getElementById('draws').textContent = '0';
+            document.getElementById('streak').textContent = '0';
+
+            const resultText = document.getElementById('result-text');
+            resultText.textContent = "じゃんけん…";
+            resultText.className = "text-lg md:text-2xl font-black text-white min-h-[36px] flex items-center justify-center";
+
+            document.getElementById('player-icon').className = "fa-solid fa-user";
+            document.getElementById('cpu-icon').className = "fa-solid fa-robot";
+
+            const defaultBoxClass = "w-20 h-20 md:w-24 md:h-24 bg-slate-700/80 rounded-2xl flex items-center justify-center text-4xl md:text-5xl border-2 border-slate-600 shadow-lg text-white";
+            document.getElementById('player-hand-box').className = defaultBoxClass;
+            document.getElementById('cpu-hand-box').className = defaultBoxClass;
+        }
+
+        window.addEventListener('keydown', (e) => {
+            if (e.key === '1') playGame('rock');
+            if (e.key === '2') playGame('scissors');
+            if (e.key === '3') playGame('paper');
+        });
+    </script>
+</body>
+</html>
